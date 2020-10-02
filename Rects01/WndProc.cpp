@@ -8,7 +8,6 @@
 extern HINSTANCE g_hInstance;
 
 static RECT g_rcDraged = {};
-static BOOL g_bCaptured = FALSE;
 
 static std::vector<RECT> g_rects;
 
@@ -18,23 +17,25 @@ static HGDIOBJ  g_hbmOld = NULL;
 static UINT     g_uCount = 0;
        UINT     g_uCount2 = 0;
 
+BOOL DoWeHaveCapture(const HWND hwnd)
+{
+    return GetCapture() == hwnd;
+}
+
 static
 void Cls_OnLButtonDown(HWND hwnd, BOOL fDoubleClick, int x, int y, UINT keyFlags)
 {
     SetRect(&g_rcDraged, x, y, x, y);
     
     SetCapture(hwnd);
-
-    g_bCaptured = TRUE;
 }
 
 static
 void Cls_OnLButtonUp(HWND hwnd, int x, int y, UINT keyFlags)
 {
-    if(g_bCaptured)
+    if(DoWeHaveCapture(hwnd))
     {
         ReleaseCapture();
-        g_bCaptured = FALSE;
 
         RECT rcNormalized = {};
         CopyRect(&rcNormalized, &g_rcDraged);
@@ -51,7 +52,7 @@ void Cls_OnLButtonUp(HWND hwnd, int x, int y, UINT keyFlags)
 static
 void Cls_OnMouseMove(HWND hwnd, int x, int y, UINT keyFlags)
 {
-    if(g_bCaptured)
+    if(DoWeHaveCapture(hwnd))
     {
         g_rcDraged.right = x;
         g_rcDraged.bottom = y;
@@ -73,15 +74,12 @@ static
 void
 PaintCurrentlyDragedRect(HDC hdc, HBRUSH hbr)
 {
-    if(g_bCaptured)
-    {
-        RECT rcNormalized = {};
-        CopyRect(&rcNormalized, &g_rcDraged);
+    RECT rcNormalized = {};
+    CopyRect(&rcNormalized, &g_rcDraged);
         
-        NormalizeRect(rcNormalized);
+    NormalizeRect(rcNormalized);
 
-        FrameRect(hdc, &rcNormalized, hbr);
-    }
+    FrameRect(hdc, &rcNormalized, hbr);
 }
 
 static
@@ -94,29 +92,25 @@ void Cls_OnPaint(HWND hwnd)
     RECT rcClient = {};
     GetClientRect(hwnd, &rcClient);
 
-    /*
-    HDC hdcMem = CreateCompatibleDC(hdc);
-    _ASSERT(hdcMem);
-
-    HBITMAP hbmMem = CreateCompatibleBitmap(hdc, GetRectWidth(rcClient), GetRectHeight(rcClient));
-    _ASSERT(hbmMem);
-
-    HGDIOBJ hbmOld = SelectObject(hdcMem, hbmMem);
-    */
-
     {
-        HBRUSH hbrBack = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-        _ASSERT(hbrBack);
+        //HBRUSH hbrBack = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+        //_ASSERT(hbrBack);
+
+        HBRUSH hbrBack = (HBRUSH)(COLOR_WINDOW + 1);
 
         FillRect(g_hdcMem, &rcClient, hbrBack);
 
-        DeleteObject(hbrBack);
+        //DeleteObject(hbrBack);
     }
 
     HBRUSH hbr = GetStockBrush(BLACK_BRUSH);
 
     PaintRects(g_hdcMem, hbr);
-    PaintCurrentlyDragedRect(g_hdcMem, hbr);
+
+    if(DoWeHaveCapture(hwnd))
+    {
+        PaintCurrentlyDragedRect(g_hdcMem, hbr);
+    }
 
     BitBlt(
         hdc,
@@ -126,12 +120,6 @@ void Cls_OnPaint(HWND hwnd)
         0, 0,
         SRCCOPY
     );
-
-    /*
-    SelectObject(hdcMem, hbmOld);
-    DeleteObject(hbmMem);
-    DeleteDC(hdcMem);
-    */
 
     EndPaint(hwnd, &ps);
 }
